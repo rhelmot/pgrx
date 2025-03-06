@@ -54,6 +54,8 @@ pub(crate) struct Install {
     sudo: bool,
     #[clap(flatten)]
     pub(crate) features: clap_cargo::Features,
+    #[clap(long)]
+    pub(crate) target: Option<String>,
     #[clap(from_global, action = ArgAction::Count)]
     pub(crate) verbose: u8,
 }
@@ -105,6 +107,7 @@ impl CommandExecute for Install {
             self.test,
             None,
             &self.features,
+            self.target.as_ref().map(|x| x.as_str()),
         )?;
         Ok(())
     }
@@ -126,6 +129,7 @@ pub(crate) fn install_extension(
     is_test: bool,
     base_directory: Option<PathBuf>,
     features: &clap_cargo::Features,
+    target: Option<&str>,
 ) -> eyre::Result<Vec<PathBuf>> {
     let mut output_tracking = Vec::new();
     let base_directory = base_directory.unwrap_or_else(|| PathBuf::from("/"));
@@ -145,7 +149,7 @@ pub(crate) fn install_extension(
     let versioned_so = get_property(&package_manifest_path, "module_pathname")?.is_none();
 
     let build_command_output =
-        build_extension(user_manifest_path.as_ref(), user_package, profile, features)?;
+        build_extension(user_manifest_path.as_ref(), user_package, profile, features, target)?;
     let build_command_bytes = build_command_output.stdout;
     let build_command_reader = BufReader::new(build_command_bytes.as_slice());
     let build_command_stream = cargo_metadata::Message::parse_stream(build_command_reader);
@@ -229,6 +233,7 @@ pub(crate) fn install_extension(
         profile,
         is_test,
         features,
+        target,
         &extdir,
         &base_directory,
         true,
@@ -293,6 +298,7 @@ pub(crate) fn build_extension(
     user_package: Option<&String>,
     profile: &CargoProfile,
     features: &clap_cargo::Features,
+    target: Option<&str>,
 ) -> eyre::Result<std::process::Output> {
     let flags = std::env::var("PGRX_BUILD_FLAGS").unwrap_or_default();
 
@@ -328,6 +334,11 @@ pub(crate) fn build_extension(
 
     for arg in flags.split_ascii_whitespace() {
         command.arg(arg);
+    }
+
+    if let Some(target) = target {
+        command.arg("--target");
+        command.arg(target);
     }
 
     let command = command.stderr(Stdio::inherit());
@@ -367,6 +378,7 @@ fn copy_sql_files(
     profile: &CargoProfile,
     is_test: bool,
     features: &clap_cargo::Features,
+    target: Option<&str>,
     extdir: &Path,
     base_directory: &Path,
     skip_build: bool,
@@ -383,6 +395,7 @@ fn copy_sql_files(
         profile,
         is_test,
         features,
+        target,
         Some(&dest),
         Option::<String>::None,
         None,

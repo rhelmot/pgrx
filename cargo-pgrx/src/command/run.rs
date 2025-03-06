@@ -43,6 +43,8 @@ pub(crate) struct Run {
     profile: Option<String>,
     #[clap(flatten)]
     features: clap_cargo::Features,
+    #[clap(long)]
+    target: Option<String>,
     #[clap(from_global, action = ArgAction::Count)]
     verbose: u8,
     /// Use an existing `pgcli` on the $PATH.
@@ -86,6 +88,7 @@ impl CommandExecute for Run {
             &profile,
             self.pgcli,
             &self.features,
+            self.target.as_ref().map(|x| x.as_str())
         )
     }
 }
@@ -104,6 +107,7 @@ pub(crate) fn run(
     profile: &CargoProfile,
     pgcli: bool,
     features: &clap_cargo::Features,
+    target: Option<&str>,
 ) -> eyre::Result<()> {
     // stop postgres
     stop_postgres(pg_config)?;
@@ -118,6 +122,7 @@ pub(crate) fn run(
         false,
         None,
         features,
+        target,
     )?;
 
     // restart postgres
